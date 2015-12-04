@@ -14,7 +14,7 @@ CACHE_FILE="$CACHE_DIR/imagemagick.tar.gz"
 
 if [ ! -f $CACHE_FILE ]; then
   # install imagemagick
-  IMAGE_MAGICK_VERSION="6.9.2-0"
+  IMAGE_MAGICK_VERSION="6.9.2-7"
   IMAGE_MAGICK_FILE="ImageMagick-$IMAGE_MAGICK_VERSION.tar.gz"
   IMAGE_MAGICK_DIR="ImageMagick-$IMAGE_MAGICK_VERSION"
   IMAGE_MAGICK_URL="http://www.imagemagick.org/download/$IMAGE_MAGICK_FILE"
@@ -26,7 +26,7 @@ if [ ! -f $CACHE_FILE ]; then
   cd $IMAGE_MAGICK_DIR
   export CPPFLAGS="-I$INSTALL_DIR/include"
   export LDFLAGS="-L$INSTALL_DIR/lib"
-  ./configure --prefix=$INSTALL_DIR
+  ./configure --prefix=$INSTALL_DIR --disable-openmp
   make && make install
   cd ..
   rm -rf $IMAGE_MAGICK_DIR
@@ -52,7 +52,7 @@ mkdir -p $(dirname $PROFILE_PATH)
 echo "export PATH=$ACTUAL_INSTALL_PATH/bin:\$PATH" >> $PROFILE_PATH
 echo "export LD_LIBRARY_PATH=$ACTUAL_INSTALL_PATH/lib:\$LD_LIBRARY_PATH" >> $PROFILE_PATH
 
-# DOWNLOAD_URL="http://www.imagemagick.org/download/ImageMagick-6.9.2-0.tar.gz"
+# DOWNLOAD_URL="http://www.imagemagick.org/download/ImageMagick-6.9.2-7.tar.gz"
 
 # echo "DOWNLOAD_URL = " $DOWNLOAD_URL | indent
 
