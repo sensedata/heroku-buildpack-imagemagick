@@ -37,7 +37,7 @@ if [ ! -f $CACHE_FILE ]; then
   cd $IMAGE_MAGICK_DIR
   export CPPFLAGS="-I$INSTALL_DIR/include"
   export LDFLAGS="-L$INSTALL_DIR/lib"
-  ./configure --prefix=$INSTALL_DIR --disable-openmp --with-openjp2=yes
+  ./configure --prefix=$INSTALL_DIR --with-openjp2=yes
   make && make install
   cd ..
   rm -rf $IMAGE_MAGICK_DIR
