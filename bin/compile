@@ -36,7 +36,7 @@ else
   mkdir -p $BUILD_DIR/$INSTALL_GHOSTSCRIPT_DIR
   wget -qO- $GHOSTSCRIPT_URL | tar xvz -C $BUILD_DIR
   cd $BUILD_DIR/ghostscript-$GHOSTSCRIPT_VERSION
-  ./configure --prefix=$BUILD_DIR/$INSTALL_GHOSTSCRIPT_DIR
+  ./configure --prefix=$HOME/$INSTALL_GHOSTSCRIPT_DIR
   make && make install
   cp Resource/Font/* $BUILD_DIR/$INSTALL_GHOSTSCRIPT_DIR/share/ghostscript/
   rm -rf $BUILD_DIR/ghostscript-$GHOSTSCRIPT_VERSION
