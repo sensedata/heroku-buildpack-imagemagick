@@ -37,7 +37,11 @@ if [ ! -f $CACHE_FILE ]; then
   cd $IMAGE_MAGICK_DIR
   export CPPFLAGS="-I$INSTALL_DIR/include"
   export LDFLAGS="-L$INSTALL_DIR/lib"
-  ./configure --prefix=$INSTALL_DIR --with-openjp2=yes
+  LIBOPENJP2_CFLAGS=$VENDOR_DIR/openjpeg/include
+  LIBOPENJP2_LIBS=$VENDOR_DIR/openjpeg/lib
+  PKG_CONFIG_PATH=$VENDOR_DIR/openjpeg/lib/pkgconfig
+
+  ./configure --enable-delegate-build --prefix=$INSTALL_DIR --with-openjp2=yes
   make && make install
   cd ..
   rm -rf $IMAGE_MAGICK_DIR
