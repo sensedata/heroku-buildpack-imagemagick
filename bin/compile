@@ -56,7 +56,7 @@ else
     --enable-delegate-build \
     --enable-zero-configuration \
     --prefix=$BUILD_DIR/$INSTALL_IMAGEMAGICK_DIR \
-    --with-gs-font-dir=$BUILD_DIR/$INSTALL_GHOSTSCRIPT_DIR/share/ghostscript/ \
+    --with-gs-font-dir=/usr/share/fonts/type1/gsfonts \
     --with-openjp2=yes \
     --with-rsvg=yes
   make && make install
