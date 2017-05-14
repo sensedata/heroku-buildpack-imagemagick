@@ -1,80 +1,88 @@
 #!/bin/bash
 
-indent() {
-  sed -u 's/^/       /'
-}
-
-echo "-----> Install ImageMagick"
+CMAKE_VERSION="${CMAKE_VERSION:-3.8.1}"
+GHOSTSCRIPT_VERSION="${GHOSTSCRIPT_VERSION:-9.21}"
+IMAGEMAGICK_VERSION="${IMAGEMAGICK_VERSION:-7.0.5-6}"
+OPENJPEG_VERSION="${OPENJPEG_VERSION:-2.1.2}"
 
 BUILD_DIR=$1
 CACHE_DIR=$2
-VENDOR_DIR="$BUILD_DIR/vendor"
-mkdir -p $VENDOR_DIR
-INSTALL_DIR="$VENDOR_DIR/imagemagick"
-mkdir -p $INSTALL_DIR
-IMAGE_MAGICK_VERSION="${IMAGE_MAGICK_VERSION:-7.0.5-6}"
-CACHE_FILE="$CACHE_DIR/imagemagick-$IMAGE_MAGICK_VERSION.tar.gz"
 
-if [ ! -f $CACHE_FILE ]; then
-  # install imagemagick
-  IMAGE_MAGICK_FILE="ImageMagick-$IMAGE_MAGICK_VERSION.tar.xz"
-  IMAGE_MAGICK_DIR="ImageMagick-$IMAGE_MAGICK_VERSION"
-  # SSL cert used on imagemagick not recognized by heroku.
-  IMAGE_MAGICK_URL="http://www.imagemagick.org/download/releases/$IMAGE_MAGICK_FILE"
+INSTALL_CMAKE_DIR="vendor/cmake"
+INSTALL_GHOSTSCRIPT_DIR="vendor/ghostscript"
+INSTALL_IMAGEMAGICK_DIR="vendor/imagemagick"
+INSTALL_OPENJPEG_DIR="vendor/openjpeg"
+PROFILE_PATH=".profile.d/imagemagick.sh"
 
-  echo "-----> Downloading ImageMagick from $IMAGE_MAGICK_URL"
-  wget $IMAGE_MAGICK_URL -P $BUILD_DIR | indent
+CACHE_HASH=`echo -n $CMAKE_VERSION$GHOSTSCRIPT_VERSION$IMAGEMAGICK_VERSION$OPENJPEG_VERSION | md5sum | awk '{print $1}'`
+CACHE_FILE="$CACHE_DIR/imagemagick-$CACHE_HASH.tar.xz"
 
-  echo "-----> Extracting ImageMagick from $BUILD_DIR/$IMAGE_MAGICK_FILE"
-  if [ ! -f $BUILD_DIR/$IMAGE_MAGICK_FILE ]; then
-    echo "Error: Unable to download ImageMagick" | indent
-    ls $BUILD_DIR | indent
-    exit 1;
-  fi
-  tar xvf $BUILD_DIR/$IMAGE_MAGICK_FILE | indent
-
-  echo "-----> Building ImageMagick"
-  cd $IMAGE_MAGICK_DIR
-  export CPPFLAGS="-I$INSTALL_DIR/include"
-  export LDFLAGS="-L$INSTALL_DIR/lib"
-  export LIBOPENJP2_CFLAGS=$VENDOR_DIR/openjpeg/include
-  export LIBOPENJP2_LIBS=$VENDOR_DIR/openjpeg/lib
-  export PKG_CONFIG_PATH=$VENDOR_DIR/openjpeg/lib/pkgconfig
-
-  ./configure --enable-delegate-build --prefix=$INSTALL_DIR --with-openjp2=yes
-  make && make install
-  cd ..
-  rm -rf $IMAGE_MAGICK_DIR
-
-  # cache for future deploys
-  echo "-----> Caching ImageMagick installation"
-  cd $VENDOR_DIR
-  REL_INSTALL_DIR="imagemagick"
-  tar czf $REL_INSTALL_DIR.tar.gz $REL_INSTALL_DIR
-  mv $REL_INSTALL_DIR.tar.gz $CACHE_FILE
+if [ -f $CACHE_FILE ]; then
+  tar xf $CACHE_FILE -C $BUILD_DIR
 
 else
-  # cache exists, extract it
-  echo "-----> Extracting ImageMagick $CACHE_FILE => $VENDOR_DIR"
-  tar xzf $CACHE_FILE -C $VENDOR_DIR
+  CMAKE_URL="https://cmake.org/files/v3.8/cmake-$CMAKE_VERSION-Linux-x86_64.tar.gz"
+  mkdir -p $BUILD_DIR/$INSTALL_CMAKE_DIR
+  wget -qO- $CMAKE_URL | tar xvz -C $BUILD_DIR/$INSTALL_CMAKE_DIR --strip 1
+
+  OPENJPEG_URL="https://github.com/uclouvain/openjpeg/archive/v$OPENJPEG_VERSION.tar.gz"
+  mkdir -p $BUILD_DIR/$INSTALL_OPENJPEG_DIR
+  wget -qO- $OPENJPEG_URL | tar xvz -C $BUILD_DIR
+  mkdir -p $BUILD_DIR/openjpeg-$OPENJPEG_VERSION/build && cd $_
+  $BUILD_DIR/$CMAKE_INSTALL_DIR/bin/cmake -DCMAKE_INSTALL_PREFIX=$BUILD_DIR/$INSTALL_OPENJPEG_DIR ..
+  rm -rf $BUILD_DIR/openjpeg-$OPENJPEG_VERSION
+
+  GHOSTSCRIPT_URL="https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs921/ghostscript-$GHOSTSCRIPT_VERSION.tar.gz"
+  mkdir -p $BUILD_DIR/$INSTALL_GHOSTSCRIPT_DIR
+  wget -qO- $GHOSTSCRIPT_URL | tar xvz -C $BUILD_DIR
+  cd $BUILD_DIR/ghostscript-$GHOSTSCRIPT_VERSION
+  ./configure --prefix=$BUILD_DIR/$INSTALL_GHOSTSCRIPT_DIR
+  make && make install
+  cp Resource/Font/* $BUILD_DIR/$INSTALL_GHOSTSCRIPT_DIR/share/ghostscript/
+  rm -rf $BUILD_DIR/ghostscript-$GHOSTSCRIPT_VERSION
+
+  IMAGEMAGICK_URL="https://github.com/ImageMagick/ImageMagick/archive/$IMAGEMAGICK_VERSION.tar.gz"
+  mkdir -p $BUILD_DIR/$INSTALL_IMAGEMAGICK_DIR
+  wget -qO- $IMAGEMAGICK_URL | tar xvz -C $BUILD_DIR
+  cd $BUILD_DIR/ImageMagick-$IMAGEMAGICK_VERSION
+
+  ./configure \
+    CPPFLAGS="-I$BUILD_DIR/$INSTALL_IMAGEMAGICK_DIR/include" \
+    LDFLAGS="-L$BUILD_DIR/$INSTALL_IMAGEMAGICK_DIR/lib -L$BUILD_DIR/$INSTALL_GHOSTSCRIPT_DIR/bin" \
+    LIBOPENJP2_CFLAGS=$BUILD_DIR/$INSTALL_OPENJPEG_DIR/include \
+    LIBOPENJP2_LIBS=$BUILD_DIR/$INSTALL_OPENJPEG_DIR/lib \
+    PATH="$BUILD_DIR/$INSTALL_GHOSTSCRIPT_DIR/bin:$PATH" \
+    PKG_CONFIG_PATH=$BUILD_DIR/$INSTALL_OPENJPEG_DIR/lib/pkgconfig \
+    --enable-delegate-build \
+    --enable-zero-configuration \
+    --prefix=$BUILD_DIR/$INSTALL_IMAGEMAGICK_DIR \
+    --with-gs-font-dir=$BUILD_DIR/$INSTALL_GHOSTSCRIPT_DIR/share/ghostscript/ \
+    --with-openjp2=yes \
+    --with-rsvg=yes
+  make && make install
+  rm -rf $BUILD_DIR/ImageMagick-$IMAGEMAGICK_VERSION
+
+  mkdir -p $BUILD_DIR/$INSTALL_IMAGEMAGICK_DIR/etc/ImageMagick
+  cat > $BUILD_DIR/$INSTALL_IMAGEMAGICK_DIR/policy.xml <<- EOF
+    <policymap>
+      <policy domain="coder" rights="none" pattern="EPHEMERAL"/>
+      <policy domain="coder" rights="none" pattern="HTTPS"/>
+      <policy domain="coder" rights="none" pattern="MVG"/>
+      <policy domain="coder" rights="none" pattern="MSL"/>
+    </policymap>
+	EOF
+  mkdir -p $(dirname $BUILD_DIR/$PROFILE_PATH)
+  cat > $BUILD_DIR/$PROFILE_PATH <<- EOF
+    export PATH=$HOME/$INSTALL_GHOSTSCRIPT_DIR/bin:$HOME/$INSTALL_IMAGEMAGICK_DIR/bin:$HOME/$INSTALL_OPENJPEG_DIR/bin:\$PATH
+    export LD_LIBRARY_PATH=$HOME/$INSTALL_IMAGEMAGICK_DIR/lib:$HOME/$INSTALL_OPENJPEG_DIR/lib:\$LD_LIBRARY_PATH
+    export MAGICK_CONFIGURE_PATH=$HOME/$INSTALL_IMAGEMAGICK_DIR
+	EOF
+
+  cd $BUILD_DIR
+  tar cJf $CACHE_FILE \
+    $INSTALL_CMAKE_DIR \
+    $INSTALL_GHOSTSCRIPT_DIR \
+    $INSTALL_IMAGEMAGICK_DIR \
+    $INSTALL_OPENJPEG_DIR \
+    $PROFILE_PATH
 fi
-
-echo "-----> Writing policy file"
-mkdir -p $INSTALL_DIR/etc/ImageMagick
-cat > $INSTALL_DIR/policy.xml <<EOF
-<policymap>
-  <policy domain="coder" rights="none" pattern="EPHEMERAL" />
-  <policy domain="coder" rights="none" pattern="HTTPS" />
-  <policy domain="coder" rights="none" pattern="MVG" />
-  <policy domain="coder" rights="none" pattern="MSL" />
-</policymap>
-EOF
-
-# update PATH and LD_LIBRARY_PATH
-echo "-----> Updating environment variables"
-PROFILE_PATH="$BUILD_DIR/.profile.d/imagemagick.sh"
-ACTUAL_INSTALL_PATH="$HOME/vendor/imagemagick"
-mkdir -p $(dirname $PROFILE_PATH)
-echo "export PATH=$ACTUAL_INSTALL_PATH/bin:$HOME/vendor/openjpeg/bin:\$PATH" >> $PROFILE_PATH
-echo "export LD_LIBRARY_PATH=$ACTUAL_INSTALL_PATH/lib:$HOME/vendor/openjpeg/lib:\$LD_LIBRARY_PATH" >> $PROFILE_PATH
-echo "export MAGICK_CONFIGURE_PATH=$ACTUAL_INSTALL_PATH" >> $PROFILE_PATH
